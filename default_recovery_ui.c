@@ -30,8 +30,8 @@ char* MENU_ITEMS[] = { "Reboot System Now",
                        "Backup and Restore",
                        "Mounts and Storage",
                        "Advanced",
-                       "PhilZ Settings",
-                       "Power Options",
+                       "Zen Menu",
+                       "Kernel Options",
                        NULL };
 
 void device_ui_init(UIParameters* ui_parameters) {

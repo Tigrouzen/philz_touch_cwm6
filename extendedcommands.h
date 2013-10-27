@@ -37,6 +37,9 @@ __system(const char *command);
 int
 show_advanced_menu();
 
+int
+show_devil_menu();
+
 int format_device(const char *device, const char *path, const char *fs_type);
 
 int format_unknown_device(const char *device, const char* path, const char *fs_type);
@@ -66,8 +69,6 @@ int can_partition(const char* volume);
 static int is_path_mounted(const char* path);
 
 int volume_main(int argc, char **argv);
-
-void show_advanced_power_menu();
 
 #ifdef RECOVERY_EXTEND_NANDROID_MENU
 void extend_nandroid_menu(char** items, int item_count, int max_items);

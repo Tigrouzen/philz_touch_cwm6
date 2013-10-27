@@ -37,11 +37,9 @@
 
 extern int __system(const char *command);
 
-#if defined(BOARD_HAS_NO_SELECT_BUTTON) || defined(BOARD_TOUCH_RECOVERY) || defined(PHILZ_TOUCH_RECOVERY)
-static int gShowBackButton = 1;
-#else
+
 static int gShowBackButton = 0;
-#endif
+
 
 #define MAX_COLS 96
 #define MAX_ROWS 32
@@ -52,13 +50,9 @@ static int gShowBackButton = 0;
 #define MIN_LOG_ROWS 3
 
 #define CHAR_WIDTH BOARD_RECOVERY_CHAR_WIDTH
-#ifndef PHILZ_TOUCH_RECOVERY
 #define CHAR_HEIGHT BOARD_RECOVERY_CHAR_HEIGHT
-#endif
 
 #define UI_WAIT_KEY_TIMEOUT_SEC    3600
-#define UI_KEY_REPEAT_INTERVAL 80
-#define UI_KEY_WAIT_REPEAT 400
 
 UIParameters ui_parameters = {
     6,       // indeterminate progress bar frames
@@ -73,15 +67,10 @@ static gr_surface *gInstallationOverlay;
 static gr_surface *gProgressBarIndeterminate;
 static gr_surface gProgressBarEmpty;
 static gr_surface gProgressBarFill;
-#ifdef PHILZ_TOUCH_RECOVERY
 static gr_surface gVirtualKeys; // surface for our virtual key buttons
-#endif
 static gr_surface gBackground;
 static int ui_has_initialized = 0;
 static int ui_log_stdout = 1;
-
-int boardEnableKeyRepeat = 0;
-static int boardRepeatableKeys[64], boardNumRepeatableKeys = 0;
 
 static const struct { gr_surface* surface; const char *name; } BITMAPS[] = {
     { &gBackgroundIcon[BACKGROUND_ICON_INSTALLING], "icon_installing" },
@@ -92,9 +81,7 @@ static const struct { gr_surface* surface; const char *name; } BITMAPS[] = {
     { &gBackgroundIcon[BACKGROUND_ICON_FIRMWARE_ERROR], "icon_firmware_error" },
     { &gProgressBarEmpty,               "progress_empty" },
     { &gProgressBarFill,                "progress_fill" },
-#ifdef PHILZ_TOUCH_RECOVERY
     { &gVirtualKeys,                    "virtual_keys" },
-#endif
     { &gBackground,                "stitch" },
     { NULL,                             NULL },
 };
@@ -128,23 +115,17 @@ static int menu_top = 0, menu_items = 0, menu_sel = 0;
 static int menu_show_start = 0;             // this is line which menu display is starting at
 static int max_menu_rows;
 
-#ifdef NOT_ENOUGH_RAINBOWS
-static int cur_rainbow_color = 0;
-static int gRainbowMode = 0;
-#endif
 
 // Key event input queue
 static pthread_mutex_t key_queue_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t key_queue_cond = PTHREAD_COND_INITIALIZER;
 static int key_queue[256], key_queue_len = 0;
-static unsigned long key_last_repeat[KEY_MAX + 1], key_press_time[KEY_MAX + 1];
 static volatile char key_pressed[KEY_MAX + 1];
 
 static void update_screen_locked(void);
 
-#ifdef BOARD_TOUCH_RECOVERY
-#include "../../vendor/koush/recovery/touch.c"
-#endif
+
+#include "swipe.c"
 
 // Return the current time as a double (including fractions of a second).
 static double now() {
@@ -173,7 +154,7 @@ static void draw_install_overlay_locked(int frame) {
 static void draw_background_locked(int icon)
 {
     gPagesIdentical = 0;
-    // gr_color(0, 0, 0, 255);
+    gr_color(0, 0, 0, 255);
     // gr_fill(0, 0, gr_fb_width(), gr_fb_height());
 
     {
@@ -241,25 +222,53 @@ static void draw_progress_locked()
     }
 }
 
-#ifdef PHILZ_TOUCH_RECOVERY
-#include "/root/Desktop/PhilZ_Touch/touch_source/philz_touch_defines.c"
-#else
-
-static void draw_text_line(int row, const char* t) {
-  if (t[0] != '\0') {
-#ifdef NOT_ENOUGH_RAINBOWS
-    if (ui_get_rainbow_mode()) ui_rainbow_mode();
-#endif
-    gr_text(0, (row+1)*CHAR_HEIGHT-1, t);
-  }
+// Draw the virtual keys on the screen.  Does not flip pages.
+// Should only be called with gUpdateMutex locked.
+static void draw_virtualkeys_locked()
+{
+  /*  gr_surface surface = gVirtualKeys;
+    int iconWidth = gr_get_width(surface);
+    int iconHeight = gr_get_height(surface);
+    int iconX = (gr_fb_width() - iconWidth) / 2;
+    int iconY = (gr_fb_height() - iconHeight);
+    gr_blit(surface, 0, 0, iconWidth, iconHeight, iconX, iconY);
+*/
 }
 
-//#define MENU_TEXT_COLOR 255, 160, 49, 255
-#define MENU_TEXT_COLOR 0, 191, 255, 255
-#define NORMAL_TEXT_COLOR 200, 200, 200, 255
-#define HEADER_TEXT_COLOR NORMAL_TEXT_COLOR
+#define LEFT_ALIGN 0
+#define CENTER_ALIGN 1
+#define RIGHT_ALIGN 2
 
-#endif
+static void draw_text_line(int row, const char* t, int align) {
+    int col = 0;
+    if (t[0] != '\0') {
+        int length = strnlen(t, MENU_MAX_COLS) * CHAR_WIDTH;
+        switch(align)
+        {
+            case LEFT_ALIGN:
+                col = 1;
+                break;
+            case CENTER_ALIGN:
+                col = ((gr_fb_width() - length) / 2);
+                break;
+            case RIGHT_ALIGN:
+                col = gr_fb_width() - length - 1;
+                break;
+        }
+        gr_text(col, (row+1)*CHAR_HEIGHT-1, t);
+    }
+}
+
+#define MENU_TEXT_COLOR 255, 0, 0, 255 //red
+//#define MENU_TEXT_COLOR 0, 128, 0, 255 //green
+//#define MENU_TEXT_COLOR 255, 160, 49, 255 //yellow-orange
+//#define MENU_TEXT_COLOR 0, 0, 0, 255 //black
+#define MENU_TEXT_COLOR 0, 191, 255, 255 //blue-normal
+//#define NORMAL_TEXT_COLOR 200, 200, 200, 255 //silver
+#define NORMAL_TEXT_COLOR 0, 247, 255, 255 //light-blue
+//#define NORMAL_TEXT_COLOR 255, 0, 0, 255 //red
+//#define NORMAL_TEXT_COLOR 0, 128, 0, 255 //green
+#define HEADER_TEXT_COLOR NORMAL_TEXT_COLOR
 
 // Redraw everything on the screen.  Does not flip pages.
 // Should only be called with gUpdateMutex locked.
@@ -269,27 +278,24 @@ static void draw_screen_locked(void)
     draw_background_locked(gCurrentIcon);
     draw_progress_locked();
 
-#ifdef PHILZ_TOUCH_RECOVERY
-        draw_touch_menu();
-#else
     if (show_text) {
         // don't "disable" the background anymore with this...
         // gr_color(0, 0, 0, 160);
         // gr_fill(0, 0, gr_fb_width(), gr_fb_height());
 
-        int total_rows = gr_fb_height() / CHAR_HEIGHT;
+        gr_surface surface = gVirtualKeys;
+        int total_rows = (gr_fb_height() / CHAR_HEIGHT) - (gr_get_height(surface) / CHAR_HEIGHT) - 1;
         int i = 0;
         int j = 0;
         int row = 0; // current row that we are drawing on
         if (show_menu) {
-#ifndef BOARD_TOUCH_RECOVERY
             gr_color(MENU_TEXT_COLOR);
             gr_fill(0, (menu_top + menu_sel - menu_show_start) * CHAR_HEIGHT,
                     gr_fb_width(), (menu_top + menu_sel - menu_show_start + 1)*CHAR_HEIGHT+1);
 
             gr_color(HEADER_TEXT_COLOR);
             for (i = 0; i < menu_top; ++i) {
-                draw_text_line(i, menu[i]);
+                draw_text_line(i, menu[i], LEFT_ALIGN);
                 row++;
             }
 
@@ -302,11 +308,11 @@ static void draw_screen_locked(void)
             for (i = menu_show_start + menu_top; i < (menu_show_start + menu_top + j); ++i) {
                 if (i == menu_top + menu_sel) {
                     gr_color(255, 255, 255, 255);
-                    draw_text_line(i - menu_show_start , menu[i]);
+                    draw_text_line(i - menu_show_start , menu[i], LEFT_ALIGN);
                     gr_color(MENU_TEXT_COLOR);
                 } else {
                     gr_color(MENU_TEXT_COLOR);
-                    draw_text_line(i - menu_show_start, menu[i]);
+                    draw_text_line(i - menu_show_start , menu[i], LEFT_ALIGN);
                 }
                 row++;
                 if (row >= max_menu_rows)
@@ -315,9 +321,6 @@ static void draw_screen_locked(void)
 
             gr_fill(0, row*CHAR_HEIGHT+CHAR_HEIGHT/2-1,
                     gr_fb_width(), row*CHAR_HEIGHT+CHAR_HEIGHT/2+1);
-#else
-            row = draw_touch_menu(menu, menu_items, menu_top, menu_sel, menu_show_start);
-#endif
         }
 
         gr_color(NORMAL_TEXT_COLOR);
@@ -331,10 +334,10 @@ static void draw_screen_locked(void)
 
         int r;
         for (r = 0; r < (available_rows < MAX_ROWS ? available_rows : MAX_ROWS); r++) {
-            draw_text_line(start_row + r, text[(cur_row + r) % MAX_ROWS]);
+            draw_text_line(start_row + r, text[(cur_row + r) % MAX_ROWS], LEFT_ALIGN);
         }
     }
-#endif
+    draw_virtualkeys_locked(); //added to draw the virtual keys
 }
 
 // Redraw everything on the screen and flip the screen (make it visible).
@@ -410,23 +413,24 @@ static void *progress_thread(void *cookie)
     return NULL;
 }
 
+//kanged this vibrate stuff from teamwin (thanks guys!)
+#define VIBRATOR_TIME_MS        20
+
 static int rel_sum = 0;
+
+
 
 static int input_callback(int fd, short revents, void *data)
 {
     struct input_event ev;
     int ret;
     int fake_key = 0;
+    gr_surface surface = gVirtualKeys;
 
     ret = ev_get_input(fd, revents, &ev);
     if (ret)
         return -1;
-
-#if defined(BOARD_TOUCH_RECOVERY) || defined(PHILZ_TOUCH_RECOVERY)
-    if (touch_handle_input(fd, ev))
-        return 0;
-#endif
-
+    swipe_handle_input(fd, &ev);
     if (ev.type == EV_SYN) {
         return 0;
     } else if (ev.type == EV_REL) {
@@ -453,13 +457,91 @@ static int input_callback(int fd, short revents, void *data)
     } else {
         rel_sum = 0;
     }
+	printf("ev.type: %x, ev.code: %x, ev.value: %i\n", ev.type, ev.code, ev.value);
+    if (ev.type == 3 && ev.code == 48 && ev.value != 0) {
+        if (in_touch == 0) {
+            in_touch = 1; //starting to track touch...
+            reset_gestures();
+        }
+    } else if (ev.type == 3 && ev.code == 48 && ev.value == 0) {
+            //finger lifted! lets run with this
+            ev.type = EV_KEY; //touch panel support!!!
+            int keywidth = gr_get_width(surface) / 4;
+            int keyoffset = (gr_fb_width() - gr_get_width(surface)) / 2;
+            if (touch_y > (gr_fb_height() - gr_get_height(surface)) && touch_x > 0) {
+                //they lifted in the touch panel region
+                if (touch_x < (keywidth + keyoffset)) {
+                    //down button
+                    ev.code = KEY_DOWN;
+                    reset_gestures();
+                } else if (touch_x < ((keywidth * 2) + keyoffset)) {
+                    //up button
+                    ev.code = KEY_UP;
+                    reset_gestures();
+                } else if (touch_x < ((keywidth * 3) + keyoffset)) {
+                    //back button
+                    ev.code = KEY_BACK;
+                    reset_gestures();
+                } else {
+                    //enter key
+                    ev.code = KEY_HOME;
+                    reset_gestures();
+                }
+                vibrate(VIBRATOR_TIME_MS);
+            }
+            if(slide_right == 1) {
+                ev.code = KEY_HOME;
+                slide_right = 0;
+            } else if(slide_left == 1) {
+                ev.code = KEY_HOME;
+                slide_left = 0;
+            }
+
+            ev.value = 1;
+            in_touch = 0;
+            reset_gestures();
+    } else if (ev.type == 3 && ev.code == 53) {
+        old_x = touch_x;
+        touch_x = ev.value;
+        if (old_x != 0)
+            diff_x += touch_x - old_x;
+
+	 if(touch_y < (gr_fb_height() - gr_get_height(surface))) {
+            if(diff_x > (gr_fb_width() / 4)) {
+                slide_right = 1;
+                reset_gestures();
+	    } else if(diff_x < ((gr_fb_width() / 4) * -1)) {
+                slide_left = 1;
+                reset_gestures();
+            }
+        } else {
+            input_buttons();
+            //reset_gestures();
+        }
+    } else if (ev.type == 3 && ev.code == 54) {
+        old_y = touch_y;
+        touch_y = ev.value;
+        if (old_y != 0)
+            diff_y += touch_y - old_y;
+
+   if(touch_y < (gr_fb_height() - gr_get_height(surface))) {
+            if (diff_y > 25) {
+                ev.code = KEY_DOWN;
+                ev.type = EV_KEY;
+                reset_gestures();
+	 } else if (diff_y < -25) {
+                ev.code = KEY_UP;
+                ev.type = EV_KEY;
+                reset_gestures();
+            }
+        } else {
+            input_buttons();
+            //reset_gestures();
+        }
+    }
 
     if (ev.type != EV_KEY || ev.code > KEY_MAX)
         return 0;
-
-    if (ev.value == 2) {
-        boardEnableKeyRepeat = 0;
-    }
 
     pthread_mutex_lock(&key_queue_mutex);
     if (!fake_key) {
@@ -471,15 +553,6 @@ static int input_callback(int fd, short revents, void *data)
     const int queue_max = sizeof(key_queue) / sizeof(key_queue[0]);
     if (ev.value > 0 && key_queue_len < queue_max) {
         key_queue[key_queue_len++] = ev.code;
-
-        if (boardEnableKeyRepeat) {
-            struct timeval now;
-            gettimeofday(&now, NULL);
-
-            key_press_time[ev.code] = (now.tv_sec * 1000) + (now.tv_usec / 1000);
-            key_last_repeat[ev.code] = 0;
-        }
-
         pthread_cond_signal(&key_queue_cond);
     }
     pthread_mutex_unlock(&key_queue_mutex);
@@ -514,10 +587,8 @@ void ui_init(void)
     ui_has_initialized = 1;
     gr_init();
     ev_init(input_callback, NULL);
-#if defined(BOARD_TOUCH_RECOVERY) || defined(PHILZ_TOUCH_RECOVERY)
-    touch_init();
-#endif
 
+    gr_surface surface = gVirtualKeys;
     text_col = text_row = 0;
     text_rows = gr_fb_height() / CHAR_HEIGHT;
     max_menu_rows = text_rows - MIN_LOG_ROWS;
@@ -527,6 +598,7 @@ void ui_init(void)
     if (max_menu_rows > MENU_MAX_ROWS)
         max_menu_rows = MENU_MAX_ROWS;
     if (text_rows > MAX_ROWS) text_rows = MAX_ROWS;
+    text_rows = text_rows - (gr_get_height(surface) / CHAR_HEIGHT) - 1;
     text_top = 1;
 
     text_cols = gr_fb_width() / CHAR_WIDTH;
@@ -577,29 +649,6 @@ void ui_init(void)
         }
     } else {
         gInstallationOverlay = NULL;
-    }
-#ifndef PHILZ_TOUCH_RECOVERY
-    char enable_key_repeat[PROPERTY_VALUE_MAX];
-    property_get("ro.cwm.enable_key_repeat", enable_key_repeat, "");
-    if (!strcmp(enable_key_repeat, "true") || !strcmp(enable_key_repeat, "1"))
-#endif
-    {
-        boardEnableKeyRepeat = 1;
-
-        char key_list[PROPERTY_VALUE_MAX];
-        property_get("ro.cwm.repeatable_keys", key_list, "");
-        if (strlen(key_list) == 0) {
-            boardRepeatableKeys[boardNumRepeatableKeys++] = KEY_UP;
-            boardRepeatableKeys[boardNumRepeatableKeys++] = KEY_DOWN;
-            boardRepeatableKeys[boardNumRepeatableKeys++] = KEY_VOLUMEUP;
-            boardRepeatableKeys[boardNumRepeatableKeys++] = KEY_VOLUMEDOWN;
-        } else {
-            char *pch = strtok(key_list, ",");
-            while (pch != NULL) {
-                boardRepeatableKeys[boardNumRepeatableKeys++] = atoi(pch);
-                pch = strtok(NULL, ",");
-            }
-        }
     }
 
     pthread_t t;
@@ -695,7 +744,7 @@ static int ui_niced = 0;
 void ui_set_nice(int enabled) {
     ui_nice = enabled;
 }
-#define NICE_INTERVAL 350
+#define NICE_INTERVAL 100
 int ui_was_niced() {
     return ui_niced;
 }
@@ -806,11 +855,8 @@ void ui_printlogtail(int nb_lines) {
     ui_log_stdout=1;
 }
 
-#ifndef PHILZ_TOUCH_RECOVERY
-// included in philz_touch_defines.c
 #define MENU_ITEM_HEADER " - "
 #define MENU_ITEM_HEADER_LENGTH strlen(MENU_ITEM_HEADER)
-#endif
 
 int ui_start_menu(const char** headers, char** items, int initial_selection) {
     int i;
@@ -848,10 +894,6 @@ int ui_start_menu(const char** headers, char** items, int initial_selection) {
 
 // No need to pass a buffer as argument. But, call with item_menu[MENU_MAX_COLS] (sizeof(item_menu) >= MENU_MAX_COLS)
 void ui_format_gui_menu(char *item_menu, const char* menu_text, const char* menu_option) {
-#ifdef PHILZ_TOUCH_RECOVERY
-    // truely right align options and left align menu text for any device
-    ui_format_touch_menu(item_menu, menu_text, menu_option);
-#else
     int len = strlen(menu_text) + strlen(menu_option) + strlen(" - ");
     if (len > MENU_MAX_COLS) {
         // no time to format it better: reduce args length!
@@ -861,7 +903,6 @@ void ui_format_gui_menu(char *item_menu, const char* menu_text, const char* menu
     strcpy(item_menu, menu_option);
     strcat(item_menu, " - ");
     strcat(item_menu, menu_text);
-#endif
 }
 
 int ui_menu_select(int sel) {
@@ -958,7 +999,6 @@ extern int volumes_changed();
 #define REFRESH_TIME_USB_INTERVAL 5
 int ui_wait_key()
 {
-    if (boardEnableKeyRepeat) return ui_wait_key_with_repeat();
     pthread_mutex_lock(&key_queue_mutex);
     int timeouts = UI_WAIT_KEY_TIMEOUT_SEC;
 
@@ -990,110 +1030,6 @@ int ui_wait_key()
         memcpy(&key_queue[0], &key_queue[1], sizeof(int) * --key_queue_len);
     }
     pthread_mutex_unlock(&key_queue_mutex);
-    return key;
-}
-
-// util for ui_wait_key_with_repeat
-int key_can_repeat(int key)
-{
-    int k = 0;
-    for (;k < boardNumRepeatableKeys; ++k) {
-        if (boardRepeatableKeys[k] == key) {
-            break;
-        }
-    }
-    if (k < boardNumRepeatableKeys) return 1;
-    return 0;
-}
-
-int ui_wait_key_with_repeat()
-{
-    int key = -1;
-
-    // Loop to wait for more keys.
-    do {
-        int timeouts = UI_WAIT_KEY_TIMEOUT_SEC;
-        int rc = 0;
-        struct timeval now;
-        struct timespec timeout;
-        pthread_mutex_lock(&key_queue_mutex);
-        while (key_queue_len == 0 && timeouts > 0) {
-            gettimeofday(&now, NULL);
-            timeout.tv_sec = now.tv_sec;
-            timeout.tv_nsec = now.tv_usec * 1000;
-            timeout.tv_sec += REFRESH_TIME_USB_INTERVAL;
-
-            rc = 0;
-            while (key_queue_len == 0 && rc != ETIMEDOUT) {
-                rc = pthread_cond_timedwait(&key_queue_cond, &key_queue_mutex,
-                                            &timeout);
-                if (volumes_changed()) {
-                    pthread_mutex_unlock(&key_queue_mutex);
-                    return REFRESH;
-                }
-            }
-            timeouts -= REFRESH_TIME_USB_INTERVAL;
-        }
-        pthread_mutex_unlock(&key_queue_mutex);
-        if (rc == ETIMEDOUT && !usb_connected()) {
-            return -1;
-        }
-
-        // Loop to wait wait for more keys, or repeated keys to be ready.
-        while (1) {
-            unsigned long now_msec;
-
-            gettimeofday(&now, NULL);
-            now_msec = (now.tv_sec * 1000) + (now.tv_usec / 1000);
-
-            pthread_mutex_lock(&key_queue_mutex);
-
-            // Replacement for the while conditional, so we don't have to lock the entire
-            // loop, because that prevents the input system from touching the variables while
-            // the loop is running which causes problems.
-            if (key_queue_len == 0) {
-                pthread_mutex_unlock(&key_queue_mutex);
-                break;
-            }
-
-            key = key_queue[0];
-            memcpy(&key_queue[0], &key_queue[1], sizeof(int) * --key_queue_len);
-
-            // sanity check the returned key.
-            if (key < 0) {
-                pthread_mutex_unlock(&key_queue_mutex);
-                return key;
-            }
-
-            // Check for already released keys and drop them if they've repeated.
-            if (!key_pressed[key] && key_last_repeat[key] > 0) {
-                pthread_mutex_unlock(&key_queue_mutex);
-                continue;
-            }
-
-            if (key_can_repeat(key)) {
-                // Re-add the key if a repeat is expected, since we just popped it. The
-                // if below will determine when the key is actually repeated (returned)
-                // in the mean time, the key will be passed through the queue over and
-                // over and re-evaluated each time.
-                if (key_pressed[key]) {
-                    key_queue[key_queue_len] = key;
-                    key_queue_len++;
-                }
-                if ((now_msec > key_press_time[key] + UI_KEY_WAIT_REPEAT && now_msec > key_last_repeat[key] + UI_KEY_REPEAT_INTERVAL) ||
-                        key_last_repeat[key] == 0) {
-                    key_last_repeat[key] = now_msec;
-                } else {
-                    // Not ready
-                    pthread_mutex_unlock(&key_queue_mutex);
-                    continue;
-                }
-            }
-            pthread_mutex_unlock(&key_queue_mutex);
-            return key;
-        }
-    } while (1);
-
     return key;
 }
 
@@ -1139,11 +1075,7 @@ int ui_get_selected_item() {
 }
 
 int ui_handle_key(int key, int visible) {
-#if defined(BOARD_TOUCH_RECOVERY) || defined(PHILZ_TOUCH_RECOVERY)
-    return touch_handle_key(key, visible);
-#else
     return device_handle_key(key, visible);
-#endif
 }
 
 void ui_delete_line(int num) {
@@ -1162,30 +1094,51 @@ void ui_increment_frame() {
         (gInstallingFrame + 1) % ui_parameters.installing_frames;
 }
 
-#ifdef NOT_ENOUGH_RAINBOWS
-int ui_get_rainbow_mode() {
-    return gRainbowMode;
+int input_buttons()
+{
+    int final_code = 0;
+    int start_draw = 0;
+    int end_draw = 0;
+    gr_surface surface = gVirtualKeys;
+
+    int keywidth = gr_get_width(surface) / 4;
+    int keyoffset = (gr_fb_width() - gr_get_width(surface)) / 2;
+    if (touch_x < (keywidth + keyoffset + 1)) {
+        //down button
+        final_code = KEY_DOWN;
+        start_draw = keyoffset;
+        end_draw = keywidth + keyoffset;
+    } else if (touch_x < ((keywidth * 2) + keyoffset + 1)) {
+        //up button
+        final_code = KEY_UP;
+        start_draw = keywidth + keyoffset + 1;
+        end_draw = (keywidth * 2) + keyoffset;
+    } else if (touch_x < ((keywidth * 3) + keyoffset + 1)) {
+        //back button
+        final_code = KEY_BACK;
+        start_draw = (keywidth * 2) + keyoffset + 1;
+        end_draw = (keywidth * 3) + keyoffset;
+    } else if (touch_x < ((keywidth * 4) + keyoffset + 1)) {
+        //enter key
+        final_code = KEY_HOME;
+        start_draw = (keywidth * 3) + keyoffset + 1;
+        end_draw = (keywidth * 4) + keyoffset;
+    }
+
+    if (touch_y > (gr_fb_height() - gr_get_height(surface)) && touch_x > 0) {
+        pthread_mutex_lock(&gUpdateMutex);
+        gr_color(0, 0, 0, 255);     // clear old touch points
+        gr_fill(0, gr_fb_height()-gr_get_height(surface)-2, start_draw-1, gr_fb_height()-gr_get_height(surface));
+        gr_fill(end_draw+1, gr_fb_height()-gr_get_height(surface)-2, gr_fb_width(), gr_fb_height()-gr_get_height(surface));
+        gr_color(MENU_TEXT_COLOR);
+        gr_fill(start_draw, gr_fb_height()-gr_get_height(surface)-2, end_draw, gr_fb_height()-gr_get_height(surface));
+        gr_flip();
+        pthread_mutex_unlock(&gUpdateMutex);
+    }
+
+    if (in_touch == 1) {
+        return final_code;
+    } else {
+        return 0;
+    }
 }
-
-void ui_rainbow_mode() {
-    static int colors[] = { 255, 0, 0,        // red
-                            255, 127, 0,      // orange
-                            255, 255, 0,      // yellow
-                            0, 255, 0,        // green
-                            60, 80, 255,      // blue
-                            143, 0, 255 };    // violet
-
-    gr_color(colors[cur_rainbow_color], colors[cur_rainbow_color+1], colors[cur_rainbow_color+2], 255);
-    cur_rainbow_color += 3;
-    if (cur_rainbow_color >= sizeof(colors)/sizeof(colors[0])) cur_rainbow_color = 0;
-}
-
-void ui_set_rainbow_mode(int rainbowMode) {
-    gRainbowMode = rainbowMode;
-
-    pthread_mutex_lock(&gUpdateMutex);
-    update_screen_locked();
-    pthread_mutex_unlock(&gUpdateMutex);
-}
-#endif
-

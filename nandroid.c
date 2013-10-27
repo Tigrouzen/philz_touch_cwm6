@@ -43,13 +43,6 @@
 #include "flashutils/flashutils.h"
 #include <libgen.h>
 
-#ifdef RECOVERY_NEED_SELINUX_FIX
-#include <selinux/selinux.h>
-#endif
-
-#ifdef PHILZ_TOUCH_RECOVERY
-#include "/root/Desktop/PhilZ_Touch/touch_source/philz_nandroid_gui.c"
-#endif
 
 // time in msec when nandroid job starts: used for dim timeout and total backup time
 static long nandroid_start_msec;
@@ -106,10 +99,6 @@ static void nandroid_callback(const char* filename)
     }
     size_progress[ui_get_text_cols() - 1] = '\0';
 
-#ifdef PHILZ_TOUCH_RECOVERY
-    int color[] = {CYAN_BLUE_CODE};
-    ui_print_color(3, color);
-#endif
 
     // do not write size progress to log file
     ui_nolog_lines(1);
@@ -122,9 +111,6 @@ static void nandroid_callback(const char* filename)
         ui_set_progress((float)nandroid_files_count / (float)nandroid_files_total);
     if (!ui_was_niced())
         ui_delete_line(2);
-#ifdef PHILZ_TOUCH_RECOVERY
-    ui_print_color(0, 0);
-#endif
 }
 
 static void compute_directory_stats(const char* directory)
@@ -173,10 +159,6 @@ static int mkyaffs2image_wrapper(const char* backup_path, const char* backup_fil
     int nand_starts = 1;
     last_size_update = 0;
     while (fgets(tmp, PATH_MAX, fp) != NULL) {
-#ifdef PHILZ_TOUCH_RECOVERY
-        if (user_cancel_nandroid(&fp, backup_file_image, 1, &nand_starts))
-            return -1;
-#endif
         tmp[PATH_MAX - 1] = '\0';
         if (callback) {
             update_size_progress(backup_file_image);
@@ -199,10 +181,6 @@ static int do_tar_compress(char* command, int callback, const char* backup_file_
     int nand_starts = 1;
     last_size_update = 0;
     while (fgets(buf, PATH_MAX, fp) != NULL) {
-#ifdef PHILZ_TOUCH_RECOVERY
-        if (user_cancel_nandroid(&fp, backup_file_image, 1, &nand_starts))
-            return -1;
-#endif
         buf[PATH_MAX - 1] = '\0';
         if (callback) {
             update_size_progress(backup_file_image);
@@ -276,10 +254,6 @@ static int dedupe_compress_wrapper(const char* backup_path, const char* backup_f
     int nand_starts = 1;
     last_size_update = 0;
     while (fgets(tmp, PATH_MAX, fp) != NULL) {
-#ifdef PHILZ_TOUCH_RECOVERY
-        if (user_cancel_nandroid(&fp, backup_file_image, 1, &nand_starts))
-            return -1;
-#endif
         tmp[PATH_MAX - 1] = '\0';
         if (callback) {
             update_size_progress(backup_file_image);
@@ -409,21 +383,6 @@ int nandroid_backup_partition_extended(const char* backup_path, const char* moun
         }
         ret = backup_handler(mount_point, tmp, callback);
     }
-#ifdef RECOVERY_NEED_SELINUX_FIX
-    if (file_found("/sdcard/clockworkmod/.nandroid_secontext") && 0 == ret && 0 != strcmp(backup_path, "-"))
-    {
-        if (0 == strcmp(mount_point, "/data") || 0 == strcmp(mount_point, "/system") || 0 == strcmp(mount_point, "/cache"))
-        {
-            ui_print("backing up selinux context...\n");
-            sprintf(tmp, "%s/%s.context", backup_path, name);
-            if (bakupcon_to_file(mount_point, tmp) < 0)
-                LOGE("backup selinux context error!\n");
-            else
-                ui_print("backup selinux context completed.\n");
-        }
-    } else
-        LOGI("skipping selinux context!\n");
-#endif
     if (umount_when_finished) {
         ensure_path_unmounted(mount_point);
     }
@@ -499,9 +458,6 @@ int nandroid_backup(const char* backup_path)
 
     ui_set_background(BACKGROUND_ICON_INSTALLING);
     nandroid_start_msec = gettime_now_msec();
-#ifdef PHILZ_TOUCH_RECOVERY
-    last_key_ev = nandroid_start_msec; //support dim screen timeout during nandroid operation
-#endif
 
     char tmp[PATH_MAX];
     ensure_directory(backup_path);
@@ -680,10 +636,6 @@ static int unyaffs_wrapper(const char* backup_file_image, const char* backup_pat
     last_size_update = 0;
     check_restore_size(backup_file_image, backup_path);
     while (fgets(tmp, PATH_MAX, fp) != NULL) {
-#ifdef PHILZ_TOUCH_RECOVERY
-        if (user_cancel_nandroid(&fp, NULL, 0, &nand_starts))
-            return -1;
-#endif
         tmp[PATH_MAX - 1] = '\0';
         if (callback) {
             update_size_progress(backup_path);
@@ -707,10 +659,6 @@ static int do_tar_extract(char* command, const char* backup_file_image, const ch
     last_size_update = 0;
     check_restore_size(backup_file_image, backup_path);
     while (fgets(buf, PATH_MAX, fp) != NULL) {
-#ifdef PHILZ_TOUCH_RECOVERY
-        if (user_cancel_nandroid(&fp, NULL, 0, &nand_starts))
-            return -1;
-#endif
         buf[PATH_MAX - 1] = '\0';
         if (callback) {
             update_size_progress(backup_path);
@@ -755,10 +703,6 @@ static int dedupe_extract_wrapper(const char* backup_file_image, const char* bac
 
     int nand_starts = 1;
     while (fgets(path, PATH_MAX, fp) != NULL) {
-#ifdef PHILZ_TOUCH_RECOVERY
-        if (user_cancel_nandroid(&fp, NULL, 0, &nand_starts))
-            return -1;
-#endif
         if (callback)
             nandroid_callback(path);
     }
@@ -966,26 +910,6 @@ int nandroid_restore_partition_extended(const char* backup_path, const char* mou
             return ret;
         }
     }
-#ifdef RECOVERY_NEED_SELINUX_FIX
-    if (file_found("/sdcard/clockworkmod/.nandroid_secontext") && 0 != strcmp(backup_path, "-"))
-    {
-        if (0 == strcmp(mount_point, "/data") || 0 == strcmp(mount_point, "/system") || 0 == strcmp(mount_point, "/cache"))
-        {
-            ui_print("restoring selinux context...\n");
-            name = basename(mount_point);
-            sprintf(tmp, "%s/%s.context", backup_path, name);
-            if ((ret = restorecon_from_file(tmp)) < 0) {
-                ui_print("restorecon from %s.context error, trying regular restorecon.\n", name);
-                if ((ret = restorecon_recursive(mount_point)) < 0) {
-                    LOGE("Restorecon %s error!\n", mount_point); 
-                    return ret;
-                }
-            }
-            ui_print("restore selinux context completed.\n");
-        }
-    } else
-        LOGE("skipping restore of selinux context\n");
-#endif
     if (umount_when_finished) {
         ensure_path_unmounted(mount_point);
     }
@@ -1047,9 +971,7 @@ int nandroid_restore(const char* backup_path, int restore_boot, int restore_syst
     ui_show_indeterminate_progress();
     nandroid_files_total = 0;
     nandroid_start_msec = gettime_now_msec();
-#ifdef PHILZ_TOUCH_RECOVERY
-    last_key_ev = gettime_now_msec();
-#endif
+
     if (ensure_path_mounted(backup_path) != 0)
         return print_and_error("Can't mount backup path\n");
     
@@ -1308,130 +1230,3 @@ int nandroid_main(int argc, char** argv)
 
     return nandroid_usage();
 }
-
-#ifdef RECOVERY_NEED_SELINUX_FIX
-int bakupcon_to_file(const char *pathname, const char *filename)
-{
-    int ret = 0;
-    struct stat sb;
-    char* filecontext = NULL;
-    FILE * f = NULL;
-    if (lstat(pathname, &sb) < 0) {
-        LOGW("bakupcon_to_file: %s not found\n", pathname);
-        return -1;
-    }
-
-    if (lgetfilecon(pathname, &filecontext) < 0) {
-        LOGW("bakupcon_to_file: can't get %s context\n", pathname);
-        ret = 1;
-    }
-    else {
-        if ((f = fopen(filename, "a+")) == NULL) {
-            LOGE("bakupcon_to_file: can't create %s\n", filename);
-            return -1;
-        }
-        //fprintf(f, "chcon -h %s '%s'\n", filecontext, pathname);
-        fprintf(f, "%s\t%s\n", pathname, filecontext);
-        fclose(f);
-    }
-
-    //skip read symlink directory
-    if (S_ISLNK(sb.st_mode)) return 0;
-
-    DIR *dir = opendir(pathname);
-    // not a directory, carry on
-    if (dir == NULL) return 0;
-
-    struct dirent *entry;
-    while ((entry = readdir(dir)) != NULL) {
-        char *entryname;
-        if (!strcmp(entry->d_name, ".."))
-            continue;
-        if (!strcmp(entry->d_name, "."))
-            continue;
-        if (asprintf(&entryname, "%s/%s", pathname, entry->d_name) == -1)
-            continue;
-        if ((is_data_media() && (strncmp(entryname, "/data/media/", 12) == 0)) ||
-                strncmp(entryname, "/data/data/com.google.android.music/files", 41) == 0 )
-			continue;
-
-        bakupcon_to_file(entryname, filename);
-        free(entryname);
-    }
-
-    closedir(dir);
-    return ret;
-}
-
-int restorecon_from_file(const char *filename)
-{
-    int ret = 0;
-    FILE * f = NULL;
-    if ((f = fopen(filename, "r")) == NULL)
-    {
-        LOGW("restorecon_from_file: can't open %s\n", filename);
-        return -1;
-    }
-
-    char linebuf[4096];
-    while(fgets(linebuf, 4096, f)) {
-        if (linebuf[strlen(linebuf)-1] == '\n')
-            linebuf[strlen(linebuf)-1] = '\0';
-
-        char *p1, *p2;
-        char *buf = linebuf;
-
-        p1 = strtok(buf, "\t");
-        p2 = strtok(NULL, "\t");
-        LOGI("%s %s\n", p1, p2);
-        if (lsetfilecon(p1, p2) < 0) {
-            LOGW("restorecon_from_file: can't setfilecon %s\n", p1);
-            ret = 1;
-        }
-    }
-    fclose(f);
-    return ret;
-}
-
-int restorecon_recursive(const char *pathname)
-{
-    int ret = 0;
-    struct stat sb;
-    if (lstat(pathname, &sb) < 0) {
-        LOGW("restorecon: %s not found\n", pathname);
-        return -1;
-    }
-
-    if (selinux_android_restorecon(pathname) < 0) {
-        LOGW("restorecon: error restoring %s context\n", pathname);
-        ret = 1;
-    }
-
-    //skip symlink
-    if (S_ISLNK(sb.st_mode)) return 0;
-
-    DIR *dir = opendir(pathname);
-    // not a directory, carry on
-    if (dir == NULL) return 0;
-
-    struct dirent *entry;
-    while ((entry = readdir(dir)) != NULL) {
-        char *entryname;
-        if (!strcmp(entry->d_name, ".."))
-            continue;
-        if (!strcmp(entry->d_name, "."))
-            continue;
-        if (asprintf(&entryname, "%s/%s", pathname, entry->d_name) == -1)
-            continue;
-        if ((is_data_media() && (strncmp(entryname, "/data/media/", 12) == 0)) ||
-                strncmp(entryname, "/data/data/com.google.android.music/files", 41) == 0 )
-			continue;
-
-        restorecon_recursive(entryname);
-        free(entryname);
-    }
-
-    closedir(dir);
-    return ret;
-}
-#endif

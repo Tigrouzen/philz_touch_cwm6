@@ -49,11 +49,6 @@ void ui_increment_frame();
 
 void ui_nolog_lines(int lines);
 
-#ifdef ENABLE_LOKI
-// Toggle for loki support
-extern int loki_support_enabled;
-#endif
-
 // Display some header text followed by a menu of items, which appears
 // at the top of the screen (in place of any scrolling ui_print()
 // output, if necessary).
@@ -61,11 +56,6 @@ int ui_start_menu(const char** headers, char** items, int initial_selection);
 // Set the menu highlight to the given index, and return it (capped to
 // the range [0..numitems).
 int ui_menu_select(int sel);
-
-#ifdef PHILZ_TOUCH_RECOVERY
-int ui_menu_touch_select(int sel);
-#endif
-
 // End menu mode, resetting the text overlay so that ui_print()
 // statements will be displayed.
 void ui_end_menu();
@@ -76,11 +66,6 @@ void ui_set_showing_back_button(int showBackButton);
 void ui_set_log_stdout(int enabled);
 int ui_should_log_stdout();
 
-#ifdef NOT_ENOUGH_RAINBOWS
-int ui_get_rainbow_mode();
-void ui_rainbow_mode();
-void ui_set_rainbow_mode(int rainbowMode);
-#endif
 
 // Set the icon (normally the only thing visible besides the progress bar).
 enum {

@@ -401,7 +401,7 @@ static int write_config_file(const char* config_file, const char* key, const cha
     // if a new settings file needs to be created, we write a user info header
     if (fp == NULL) {
         const char* header[] = {
-            "#PhilZ Touch Settings File\n",
+            "#Zen Touch Settings File\n",
             "#Edit only in appropriate UNIX format (Notepad+++...)\n",
             "#Entries are in the form of:\n",
             "#key=value\n",
@@ -835,19 +835,16 @@ int run_ors_script(const char* ors_script) {
                         ret_val = 1;
                         break;
                     }
-                    ensure_path_mounted("/sd-ext");
                     ensure_path_mounted("/cache");
                     if (no_wipe_confirm) {
                         //do not confirm before wipe for scripts started at boot
                         __system("rm -r /data/dalvik-cache");
                         __system("rm -r /cache/dalvik-cache");
-                        __system("rm -r /sd-ext/dalvik-cache");
                         ui_print("Dalvik Cache wiped.\n");
                     } else {
                         if (confirm_selection( "Confirm wipe?", "Yes - Wipe Dalvik Cache")) {
                             __system("rm -r /data/dalvik-cache");
                             __system("rm -r /cache/dalvik-cache");
-                            __system("rm -r /sd-ext/dalvik-cache");
                             ui_print("Dalvik Cache wiped.\n");
                         }
                     }
@@ -1054,7 +1051,7 @@ static void choose_default_ors_menu(const char* ors_path)
     }
 
     char ors_dir[PATH_MAX];
-    sprintf(ors_dir, "%s/clockworkmod/ors/", ors_path);
+    sprintf(ors_dir, "/etc/ors/", ors_path);
     if (access(ors_dir, F_OK) == -1) {
         //custom folder does not exist
         browse_for_file = 1;
@@ -1069,7 +1066,7 @@ static void choose_default_ors_menu(const char* ors_path)
     char* ors_file = choose_file_menu(ors_dir, ".ors", headers);
     if (no_files_found == 1) {
         //0 valid files to select, let's continue browsing next locations
-        ui_print("No *.ors files in %s/clockworkmod/ors\n", ors_path);
+        ui_print("No *.ors files in /etc/ors\n", ors_path);
         browse_for_file = 1;
     } else {
         browse_for_file = 0;
@@ -1278,9 +1275,6 @@ void misc_nandroid_menu()
     char item_ors_format[MENU_MAX_COLS];
     char item_size_progress[MENU_MAX_COLS];
     char item_nand_progress[MENU_MAX_COLS];
-#ifdef RECOVERY_NEED_SELINUX_FIX
-    char item_secontext[MENU_MAX_COLS];
-#endif
     char* list[] = { item_md5,
                     item_preload,
                     item_compress,
@@ -1290,9 +1284,6 @@ void misc_nandroid_menu()
                     item_nand_progress,
                     "Default Backup Format...",
                     "Regenerate md5 Sum",
-#ifdef RECOVERY_NEED_SELINUX_FIX
-                    item_secontext,
-#endif
                     NULL
     };
 
@@ -1335,13 +1326,6 @@ void misc_nandroid_menu()
         if (hidenandprogress)
             ui_format_gui_menu(item_nand_progress, "Hide Nandroid Progress", "(x)");
         else ui_format_gui_menu(item_nand_progress, "Hide Nandroid Progress", "( )");
-#ifdef RECOVERY_NEED_SELINUX_FIX
-        char nandroid_secontext_file[] = "/sdcard/clockworkmod/.nandroid_secontext";
-        int nandroid_secontext = file_found(nandroid_secontext_file);
-        if (nandroid_secontext)
-            ui_format_gui_menu(item_secontext, "Process SE Context - JB 4.3", "(x)");
-        else ui_format_gui_menu(item_secontext, "Process SE Context - JB 4.3", "( )");
-#endif
         int chosen_item = get_menu_selection(headers, list, 0, 0);
         if (chosen_item == GO_BACK)
             break;
@@ -1423,16 +1407,6 @@ void misc_nandroid_menu()
             case 8:
                 regenerate_md5_sum_menu();
                 break;
-#ifdef RECOVERY_NEED_SELINUX_FIX
-            case 9:
-                {
-                    nandroid_secontext ^= 1;
-                    if (nandroid_secontext)
-                        write_string_to_file(nandroid_secontext_file, "1");
-                    else delete_a_file(nandroid_secontext_file);
-                }
-                break;
-#endif
         }
     }
 }
@@ -1844,10 +1818,6 @@ void reset_custom_job_settings(int custom_job) {
 
 static void ui_print_backup_list() {
     ui_print("This will process");
-    if (backup_boot)
-        ui_print(" - boot");
-    if (backup_recovery)
-        ui_print(" - recovery");
     if (backup_system)
         ui_print(" - system");
     if (backup_preload)
@@ -1856,16 +1826,6 @@ static void ui_print_backup_list() {
         ui_print(" - data");
     if (backup_cache)
         ui_print(" - cache");
-    if (backup_sdext)
-        ui_print(" - sd-ext");
-    if (backup_modem)
-        ui_print(" - modem");
-    if (backup_radio)
-        ui_print(" - radio");
-    if (backup_wimax)
-        ui_print(" - wimax");
-    if (backup_efs)
-        ui_print(" - efs");
     if (backup_misc)
         ui_print(" - misc");
     if (backup_data_media)
@@ -2174,16 +2134,11 @@ static void custom_restore_menu(const char* backup_path) {
     char item_reboot[MENU_MAX_COLS];
     char item_wimax[MENU_MAX_COLS];
     char* list[] = { item_boot,
-                item_recovery,
                 item_system,
                 item_preload,
                 item_data,
                 item_andsec,
                 item_cache,
-                item_sdext,
-                item_modem,
-                item_radio,
-                item_efs,
                 item_misc,
                 item_datamedia,
                 ">> Start Custom Restore Job <<",
@@ -2200,11 +2155,6 @@ static void custom_restore_menu(const char* backup_path) {
 
     reset_custom_job_settings(1);
     for (;;) {
-        if (backup_boot) ui_format_gui_menu(item_boot, "Restore boot", "(x)");
-        else ui_format_gui_menu(item_boot, "Restore boot", "( )");
-
-        if (backup_recovery) ui_format_gui_menu(item_recovery, "Restore recovery", "(x)");
-        else ui_format_gui_menu(item_recovery, "Restore recovery", "( )");
 
         if (backup_system) ui_format_gui_menu(item_system, "Restore system", "(x)");
         else ui_format_gui_menu(item_system, "Restore system", "( )");
@@ -2224,33 +2174,6 @@ static void custom_restore_menu(const char* backup_path) {
 
         if (backup_cache) ui_format_gui_menu(item_cache, "Restore cache", "(x)");
         else ui_format_gui_menu(item_cache, "Restore cache", "( )");
-
-        if (backup_sdext) ui_format_gui_menu(item_sdext, "Restore sd-ext", "(x)");
-        else ui_format_gui_menu(item_sdext, "Restore sd-ext", "( )");
-
-        if (volume_for_path("/modem") == NULL)
-            ui_format_gui_menu(item_modem, "Restore modem", "N/A");
-        else if (backup_modem == RAW_IMG_FILE)
-            ui_format_gui_menu(item_modem, "Restore modem [.img]", "(x)");
-        else if (backup_modem == RAW_BIN_FILE)
-            ui_format_gui_menu(item_modem, "Restore modem [.bin]", "(x)");
-        else ui_format_gui_menu(item_modem, "Restore modem", "( )");
-
-        if (volume_for_path("/radio") == NULL)
-            ui_format_gui_menu(item_radio, "Restore radio", "N/A");
-        else if (backup_radio == RAW_IMG_FILE)
-            ui_format_gui_menu(item_radio, "Restore radio [.img]", "(x)");
-        else if (backup_radio == RAW_BIN_FILE)
-            ui_format_gui_menu(item_radio, "Restore radio [.bin]", "(x)");
-        else ui_format_gui_menu(item_radio, "Restore radio", "( )");
-
-        if (volume_for_path("/efs") == NULL)
-            ui_format_gui_menu(item_efs, "Restore efs", "N/A");
-        else if (backup_efs == RESTORE_EFS_IMG)
-            ui_format_gui_menu(item_efs, "Restore efs [.img]", "(x)");
-        else if (backup_efs == RESTORE_EFS_TAR)
-            ui_format_gui_menu(item_efs, "Restore efs [.tar]", "(x)");
-        else ui_format_gui_menu(item_efs, "Restore efs", "( )");
 
         if (volume_for_path("/misc") == NULL)
             ui_format_gui_menu(item_misc, "Restore misc", "N/A");
@@ -2926,7 +2849,7 @@ void custom_backup_restore_menu() {
 // launch aromafm.zip from default locations
 static int default_aromafm(const char* aromafm_path) {
     char aroma_file[PATH_MAX];
-    sprintf(aroma_file, "%s/clockworkmod/aromafm/aromafm.zip", aromafm_path);
+    sprintf(aroma_file, "/tmp/aromafm.zip", aromafm_path);
 
     if (file_found(aroma_file)) {
 #ifdef PHILZ_TOUCH_RECOVERY
@@ -2954,7 +2877,7 @@ void run_aroma_browser() {
         }
     }
     if (ret != 0)
-        ui_print("No clockworkmod/aromafm/aromafm.zip on storage paths\n");
+        ui_print("No /tmp/aromafm.zip on storage paths\n");
 }
 //------ end aromafm launcher functions
 
@@ -3068,14 +2991,13 @@ static void import_export_settings() {
 
 void show_philz_settings()
 {
-    static const char* headers[] = {  "PhilZ Settings",
+    static const char* headers[] = {  "Zen Settings",
                                 NULL
     };
 
     static char* list[] = { "Open Recovery Script",
                             "Custom Backup and Restore",
                             "Aroma File Manager",
-                            "GUI Preferences",
                             "Save and Restore Settings",
                             "Reset All Recovery Settings",
                             "About",
@@ -3107,7 +3029,7 @@ void show_philz_settings()
 
                     if (browse_for_file) {
                         //no files found in default locations, let's search manually for a custom ors
-                        ui_print("No .ors files under clockworkmod/ors in default storage paths\n");
+                        ui_print("No .ors files under /etc/ors in default storage paths\n");
                         ui_print("Manually search .ors files...\n");
                         show_custom_ors_menu();
                     }
@@ -3122,26 +3044,14 @@ void show_philz_settings()
                 run_aroma_browser();
                 break;
             case 3:
-#ifdef PHILZ_TOUCH_RECOVERY
-                show_touch_gui_menu();
-#endif
-                break;
-            case 4:
                 import_export_settings();
                 break;
-            case 5:
+            case 4:
                 if (confirm_selection("Reset all recovery settings?", "Yes - Reset to Defaults")) {
                     delete_a_file(PHILZ_SETTINGS_FILE);
                     refresh_recovery_settings();
                     ui_print("All settings reset to default!\n");
                 }
-                break;
-            case 6:
-                ui_print(EXPAND(RECOVERY_MOD_VERSION) "\n");
-                ui_print("Build version: " EXPAND(PHILZ_BUILD) " - " EXPAND(TARGET_COMMON_NAME) "\n");
-                ui_print("CWM Base version: " EXPAND(CWM_BASE_VERSION) "\n");
-                //ui_print(EXPAND(BUILD_DATE)"\n");
-                ui_print("Compiled %s at %s\n", __DATE__, __TIME__);
                 break;
         }
     }

@@ -442,7 +442,7 @@ copy_sideloaded_package(const char* original_path) {
 
 static const char**
 prepend_title(const char** headers) {
-    const char* title[] = { EXPAND(RECOVERY_MOD_VERSION),
+    const char* title[] = { EXPAND(Zen Touch Recovery),
                       NULL };
 
     // count the number of lines in our title, plus the
@@ -471,9 +471,6 @@ get_menu_selection(const char** headers, char** items, int menu_only,
     int item_count = ui_start_menu(headers, items, initial_selection);
     int selected = initial_selection;
     int chosen_item = -1; // NO_ACTION
-#ifdef NOT_ENOUGH_RAINBOWS
-    int wrap_count = 0;
-#endif
 
     while (chosen_item < 0 && chosen_item != GO_BACK) {
         int key = ui_wait_key();
@@ -510,11 +507,6 @@ get_menu_selection(const char** headers, char** items, int menu_only,
                     ++selected;
                     selected = ui_menu_select(selected);
                     break;
-#ifdef PHILZ_TOUCH_RECOVERY
-                case HIGHLIGHT_ON_TOUCH:
-                    selected = ui_menu_touch_select(selected);
-                    break;
-#endif
                 case SELECT_ITEM:
                     chosen_item = selected;
                     if (ui_is_showing_back_button()) {
@@ -528,31 +520,10 @@ get_menu_selection(const char** headers, char** items, int menu_only,
                 case GO_BACK:
                     chosen_item = GO_BACK;
                     break;
-#ifdef PHILZ_TOUCH_RECOVERY
-                case GESTURE_ACTIONS:
-                    handle_gesture_actions(headers, items, initial_selection);
-                    break;
-#endif
             }
         } else if (!menu_only) {
             chosen_item = action;
         }
-#ifdef NOT_ENOUGH_RAINBOWS
-        if (abs(selected - old_selected) > 1) {
-            wrap_count++;
-            if (wrap_count == 5) {
-                wrap_count = 0;
-                if (ui_get_rainbow_mode()) {
-                    ui_set_rainbow_mode(0);
-                    ui_print("Rainbow mode disabled\n");
-                }
-                else {
-                    ui_set_rainbow_mode(1);
-                    ui_print("Rainbow mode enabled!\n");
-                }
-            }
-        }
-#endif
     }
 
     ui_end_menu();
@@ -801,8 +772,8 @@ prompt_and_wait() {
                     show_philz_settings();
                     break;
 
-                case ITEM_POWEROFF:
-                    show_advanced_power_menu();
+	            case ITEM_DEVIL:
+                    show_devil_menu();
                     break;
             }
             if (ret == REFRESH) {
@@ -856,9 +827,6 @@ setup_adbd() {
 
 // call a clean reboot
 void reboot_main_system(int cmd, int flags, char *arg) {
-#ifdef PHILZ_TOUCH_RECOVERY
-    verify_settings_file();
-#endif
     verify_root_and_recovery();
     finish_recovery(NULL); // sync() in here
     vold_unmount_all();
@@ -961,9 +929,6 @@ main(int argc, char **argv) {
 
     device_ui_init(&ui_parameters);
     ui_init();
-    ui_print(EXPAND(RECOVERY_MOD_VERSION) "\n");
-    ui_print("CWM Base version: " EXPAND(CWM_BASE_VERSION) "\n");
-    LOGI("Build version: " EXPAND(PHILZ_BUILD) " - " EXPAND(TARGET_COMMON_NAME) "\n");
 
     load_volume_table();
     process_volumes();
@@ -1073,9 +1038,7 @@ main(int argc, char **argv) {
         is_user_initiated_recovery = 1;
         if (!headless) {
             ui_set_show_text(1);
-#ifndef PHILZ_TOUCH_RECOVERY
             ui_set_background(BACKGROUND_ICON_CLOCKWORK);
-#endif
         }
 
         if (extendedcommand_file_exists()) {
@@ -1129,9 +1092,6 @@ main(int argc, char **argv) {
         prompt_and_wait();
     }
 
-#ifdef PHILZ_TOUCH_RECOVERY
-    verify_settings_file();
-#endif
     verify_root_and_recovery();
 
     // If there is a radio image pending, reboot now to install it.

@@ -46,16 +46,7 @@
 
 #include "adb_install.h"
 
-#ifdef ENABLE_LOKI
-#include "compact_loki.h"
-#endif
-
 int signature_check_enabled = 1;
-
-#ifdef ENABLE_LOKI
-int loki_support_enabled = 1;
-#endif
-
 int script_assert_enabled = 1;
 
 int get_filtered_menu_selection(const char** headers, char** items, int menu_only, int initial_selection, int items_count) {
@@ -115,15 +106,6 @@ toggle_signature_check()
     ui_print("Signature Check: %s\n", signature_check_enabled ? "Enabled" : "Disabled");
 }
 
-#ifdef ENABLE_LOKI
-void
-toggle_loki_support()
-{
-    loki_support_enabled = !loki_support_enabled;
-    ui_print("Loki Support: %s\n", loki_support_enabled ? "Enabled" : "Disabled");
-}
-#endif
-
 int install_zip(const char* packagefilepath)
 {
     ui_print("\n-- Installing: %s\n", packagefilepath);
@@ -137,14 +119,6 @@ int install_zip(const char* packagefilepath)
         ui_print("Installation aborted.\n");
         return 1;
     }
-#ifdef ENABLE_LOKI
-    if(loki_support_enabled) {
-       ui_print("Checking if loki-fying is needed");
-       if (loki_check() != 0) {
-           return 1;
-       }
-    }
-#endif
     ui_set_background(BACKGROUND_ICON_NONE);
     ui_print("\nInstall from sdcard complete.\n");
     return 0;
@@ -692,17 +666,6 @@ int format_device(const char *device, const char *path, const char *fs_type) {
         return 0;
     }
 
-#ifdef USE_F2FS
-    if (strcmp(fs_type, "f2fs") == 0) {
-        int result = make_f2fs_main(device, v->mount_point);
-        if (result != 0) {
-            LOGE("format_volume: mkfs.f2f2 failed on %s\n", device);
-            return -1;
-        }
-        return 0;
-    }
-#endif
-
     return format_unknown_device(device, path, fs_type);
 }
 
@@ -998,7 +961,7 @@ void show_nandroid_advanced_restore_menu(const char* path)
     };
 
     static char* list[] = { "Restore boot",
-                            "Restore system (+/- preload)",
+                            "Restore system",
                             "Restore data",
                             "Restore cache",
                             "Restore sd-ext",
@@ -1021,7 +984,7 @@ void show_nandroid_advanced_restore_menu(const char* path)
                 nandroid_restore(file, 1, 0, 0, 0, 0, 0);
             break;
         case 1:
-            if (confirm_selection(confirm_restore, "Yes - Restore system +/- preload"))
+            if (confirm_selection(confirm_restore, "Yes - Restore system"))
                 nandroid_restore(file, 0, 1, 0, 0, 0, 0);
             break;
         case 2:
@@ -1413,48 +1376,7 @@ int can_partition(const char* volume) {
     return 1;
 }
 
-void show_advanced_power_menu() {
-    static const char* headers[] = { "Advanced power options", "", NULL };
-
-    char* list[] = { "Reboot Recovery",
-                     "Reboot to Bootloader",
-                     "Power Off",
-                     NULL
-    };
-
-    char bootloader_mode[PROPERTY_VALUE_MAX];
-#ifdef BOOTLOADER_CMD_ARG
-    // force this extra way to use BoardConfig.mk flags
-    sprintf(bootloader_mode, BOOTLOADER_CMD_ARG);
-#else
-    property_get("ro.bootloader.mode", bootloader_mode, "bootloader");
-#endif
-    if (strcmp(bootloader_mode, "download") == 0)
-        list[1] = "Reboot to Download Mode";
-
-    int chosen_item = get_menu_selection(headers, list, 0, 0);
-    switch (chosen_item)
-    {
-        case 0:
-            ui_print("Rebooting recovery...\n");
-            reboot_main_system(ANDROID_RB_RESTART2, 0, "recovery");
-            break;
-        case 1:
-            ui_print("Rebooting to %s mode...\n", bootloader_mode);
-            reboot_main_system(ANDROID_RB_RESTART2, 0, bootloader_mode);
-            break;
-        case 2:
-            ui_print("Shutting down...\n");
-            reboot_main_system(ANDROID_RB_POWEROFF, 0, 0);
-            break;
-    }
-}
-
-#ifdef ENABLE_LOKI
-    #define FIXED_ADVANCED_ENTRIES 6
-#else
-    #define FIXED_ADVANCED_ENTRIES 5
-#endif
+#define FIXED_ADVANCED_ENTRIES 4
 
 int show_advanced_menu()
 {
@@ -1476,10 +1398,6 @@ int show_advanced_menu()
     list[1] = "Report Error";
     list[2] = "Key Test";
     list[3] = "Show log";
-    // list[4] // data/media/0 toggle: initialised below
-#ifdef ENABLE_LOKI
-    list[5] = "Toggle Loki Support";
-#endif
 
     char list_prefix[] = "Partition ";
     if (can_partition(primary_path)) {
@@ -1516,12 +1434,10 @@ int show_advanced_menu()
             case 0:
                 if (0 != ensure_path_mounted("/data"))
                     break;
-                ensure_path_mounted("/sd-ext");
                 ensure_path_mounted("/cache");
                 if (confirm_selection( "Confirm wipe?", "Yes - Wipe Dalvik Cache")) {
                     __system("rm -r /data/dalvik-cache");
                     __system("rm -r /cache/dalvik-cache");
-                    __system("rm -r /sd-ext/dalvik-cache");
                     ui_print("Dalvik Cache wiped.\n");
                 }
                 ensure_path_unmounted("/data");
@@ -1545,11 +1461,7 @@ int show_advanced_menu()
                 break;
             }
             case 3:
-#ifdef PHILZ_TOUCH_RECOVERY
-                show_log_menu();
-#else
                 ui_printlogtail(12);
-#endif
                 break;
             case 4:
                 if (is_data_media()) {
@@ -1567,11 +1479,6 @@ int show_advanced_menu()
                 }
                 else ui_print("datamedia not supported\n");
                 break;
-#ifdef ENABLE_LOKI
-            case 5:
-                toggle_loki_support();
-                break;
-#endif
             default:
                 partition_sdcard(list[chosen_item] + strlen(list_prefix));
                 break;
@@ -1581,6 +1488,104 @@ int show_advanced_menu()
     free(list[4]);
     for(; j > 0; --j) {
         free(list[FIXED_ADVANCED_ENTRIES + j - 1]);
+    }
+    return chosen_item;
+}
+
+
+void show_debug_menu()
+{
+    static char* headers[] = {  "Devil Kernel - Debug menu",
+								"",
+								NULL
+    };
+
+    static char* list[] = { "Copy last_kmsg to SD Card",
+    						"Copy recovery log to SD Card",
+    						NULL
+    };
+
+    for (;;)
+    {
+		int chosen_item = get_menu_selection(headers, list, 0, 0);
+        if (chosen_item == GO_BACK)
+            break;
+		switch (chosen_item)
+        {
+
+			case 0:
+            		{
+				if ( 0 == ensure_path_mounted("/storage/sdcard0") )
+				{          
+					__system("mkdir -p /sdcard/devil");	
+					__system("cp /proc/last_kmsg /storage/sdcard0/devil/");
+					__system("cp /proc/cmdline /storage/sdcard0/devil/");
+					ui_print("last_kmsg and /proc/cmdline copied to /storage/sdcard0/devil\n");
+					ensure_path_unmounted("/storage/sdcard0");
+				}
+				else
+				{
+					ui_print("Unable to mount SD Card - nothing done!\n");
+				}
+                	break;
+            		}
+
+			case 1:
+            		{
+				if ( 0 == ensure_path_mounted("/storage/sdcard0") )
+				{   
+					mkdir("/sdcard/devil", S_IRWXU);
+					__system("cp /tmp/recovery.log /sdcard/devil/recovery.log");
+					ui_print("/tmp/recovery.log was copied to /sdcard/devil/recovery.log.\n");
+				}
+				else
+				{
+					ui_print("Unable to mount SD Card - nothing done!\n");
+				}
+			break;
+			}
+		}
+	}
+}
+
+int show_devil_menu()
+{
+    ensure_path_mounted("/system");
+    ensure_path_mounted("/data");
+//    ensure_path_mounted("/datadata");    
+
+    static char* headers[] = {  "Extra Kernel - Extras Menu",
+								"",
+								NULL
+    };
+
+    static char* list[] = { "Misc Menu",	
+			    "Debug Menu",	 	 
+                            					NULL
+    };
+
+    int chosen_item = 0;
+
+    for (;;)
+    {
+	chosen_item = get_menu_selection(headers, list, 0, 0);
+        if (chosen_item == GO_BACK)
+            break;
+		switch (chosen_item)
+        	{
+			case 0:
+			{
+				show_misc_menu();
+				break;
+			}
+
+
+			case 1:
+			{
+				show_debug_menu();
+				break;
+			}
+        }
     }
     return chosen_item;
 }
@@ -1616,16 +1621,10 @@ void create_fstab()
     }
     Volume *vol = volume_for_path("/boot");
     if (NULL != vol && strcmp(vol->fs_type, "mtd") != 0 && strcmp(vol->fs_type, "emmc") != 0 && strcmp(vol->fs_type, "bml") != 0)
-         write_fstab_root("/boot", file);
     write_fstab_root("/cache", file);
     write_fstab_root("/data", file);
-    write_fstab_root("/datadata", file);
-    write_fstab_root("/emmc", file);
     write_fstab_root("/system", file);
-    write_fstab_root("/preload", file);
     write_fstab_root("/sdcard", file);
-    write_fstab_root("/sd-ext", file);
-    write_fstab_root("/external_sd", file);
     fclose(file);
     LOGI("Completed outputting fstab.\n");
 }
@@ -1723,9 +1722,8 @@ void handle_failure(int ret)
     if (0 != ensure_path_mounted(get_primary_storage_path()))
         return;
     mkdir("/sdcard/clockworkmod", S_IRWXU | S_IRWXG | S_IRWXO);
-    __system("cp /tmp/recovery.log /sdcard/clockworkmod/philz_recovery.log");
-    ui_print("/tmp/recovery.log copied to /sdcard/clockworkmod/philz_recovery.log\n");
-    ui_print("Send file to Phil3759 @xda\n");
+    __system("cp /tmp/recovery.log /sdcard/clockworkmod/recovery.log");
+    ui_print("/tmp/recovery.log was copied to /sdcard/clockworkmod/recovery.log. Please open ROM Manager to report the issue.\n");
 }
 
 static int is_path_mounted(const char* path) {

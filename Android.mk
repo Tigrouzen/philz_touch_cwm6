@@ -2,10 +2,6 @@ LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 
 commands_recovery_local_path := $(LOCAL_PATH)
-
-#Extra BoardConfig flags
-include $(LOCAL_PATH)/boardconfig/BoardConfig.mk
-
 # LOCAL_CPP_EXTENSION := .c
 
 LOCAL_SRC_FILES := \
@@ -42,57 +38,24 @@ ifdef I_AM_KOUSH
 RECOVERY_NAME := ClockworkMod Recovery
 LOCAL_CFLAGS += -DI_AM_KOUSH
 else
-ifndef RECOVERY_NAME
-RECOVERY_NAME := CWM-based Recovery
-endif
+RECOVERY_NAME := Zen Touch Recovery
 endif
 
-PHILZ_BUILD := 5.18.4
-CWM_BASE_VERSION := v6.0.4.4
-LOCAL_CFLAGS += -DCWM_BASE_VERSION="$(CWM_BASE_VERSION)"
-RECOVERY_VERSION := $(RECOVERY_NAME) $(CWM_BASE_VERSION)
+RECOVERY_VERSION := $(RECOVERY_NAME) v6.0.4.4
 
 LOCAL_CFLAGS += -DRECOVERY_VERSION="$(RECOVERY_VERSION)"
 RECOVERY_API_VERSION := 2
 LOCAL_CFLAGS += -DRECOVERY_API_VERSION=$(RECOVERY_API_VERSION)
-
-#PHILZ_TOUCH_RECOVERY := true
-ifdef PHILZ_TOUCH_RECOVERY
-LOCAL_CFLAGS += -DPHILZ_TOUCH_RECOVERY
-RECOVERY_MOD_NAME := PhilZ Touch
-else
-ifndef RECOVERY_MOD_NAME
-RECOVERY_MOD_NAME := CWM Advanced Edition
-endif
-endif
-
-RECOVERY_MOD_VERSION := $(RECOVERY_MOD_NAME) 5
-LOCAL_CFLAGS += -DRECOVERY_MOD_VERSION="$(RECOVERY_MOD_VERSION)"
-LOCAL_CFLAGS += -DPHILZ_BUILD="$(PHILZ_BUILD)"
-#compile date:
-#LOCAL_CFLAGS += -DBUILD_DATE="\"`date`\""
-
-#debug and calibration logging for touch code
-#RECOVERY_TOUCH_DEBUG := true
-ifeq ($(RECOVERY_TOUCH_DEBUG),true)
-LOCAL_CFLAGS += -DRECOVERY_TOUCH_DEBUG
-endif
-
-ifdef PHILZ_TOUCH_RECOVERY
-ifeq ($(BOARD_USE_CUSTOM_RECOVERY_FONT),)
+RECOVERY_MOD_VERSION := Zen Touch Recovery
+#ifdef BOARD_TOUCH_RECOVERY
+#ifeq ($(BOARD_USE_CUSTOM_RECOVERY_FONT),)
   BOARD_USE_CUSTOM_RECOVERY_FONT := \"roboto_15x24.h\"
-endif
-endif
+#endif
+#endif
 
-ifdef BOARD_TOUCH_RECOVERY
-ifeq ($(BOARD_USE_CUSTOM_RECOVERY_FONT),)
-  BOARD_USE_CUSTOM_RECOVERY_FONT := \"roboto_15x24.h\"
-endif
-endif
-
-ifeq ($(BOARD_USE_CUSTOM_RECOVERY_FONT),)
-  BOARD_USE_CUSTOM_RECOVERY_FONT := \"font_10x18.h\"
-endif
+#ifeq ($(BOARD_USE_CUSTOM_RECOVERY_FONT),)
+#  BOARD_USE_CUSTOM_RECOVERY_FONT := \"font_10x18.h\"
+#endif
 
 ifeq ($(ENABLE_LOKI_RECOVERY),true)
   LOCAL_CFLAGS += -DENABLE_LOKI
@@ -105,9 +68,8 @@ BOARD_RECOVERY_CHAR_HEIGHT := $(shell echo $(BOARD_USE_CUSTOM_RECOVERY_FONT) | c
 
 LOCAL_CFLAGS += -DBOARD_RECOVERY_CHAR_WIDTH=$(BOARD_RECOVERY_CHAR_WIDTH) -DBOARD_RECOVERY_CHAR_HEIGHT=$(BOARD_RECOVERY_CHAR_HEIGHT)
 
-BOARD_RECOVERY_DEFINES := BOARD_HAS_NO_SELECT_BUTTON BOARD_UMS_LUNFILE BOARD_RECOVERY_ALWAYS_WIPES BOARD_RECOVERY_HANDLES_MOUNT BOARD_TOUCH_RECOVERY RECOVERY_EXTEND_NANDROID_MENU TARGET_USE_CUSTOM_LUN_FILE_PATH TARGET_DEVICE TARGET_RECOVERY_FSTAB
-BOARD_RECOVERY_DEFINES += TARGET_COMMON_NAME BOOTLOADER_CMD_ARG BOARD_HAS_SLOW_STORAGE RECOVERY_NEED_SELINUX_FIX
-BOARD_RECOVERY_DEFINES += BRIGHTNESS_SYS_FILE BATTERY_LEVEL_PATH BOARD_POST_UNBLANK_COMMAND BOARD_HAS_LOW_RESOLUTION RECOVERY_TOUCHSCREEN_SWAP_XY RECOVERY_TOUCHSCREEN_FLIP_X RECOVERY_TOUCHSCREEN_FLIP_Y
+BOARD_RECOVERY_DEFINES := BOARD_RECOVERY_SWIPE BOARD_HAS_NO_SELECT_BUTTON BOARD_UMS_LUNFILE BOARD_RECOVERY_ALWAYS_WIPES BOARD_RECOVERY_HANDLES_MOUNT BOARD_TOUCH_RECOVERY RECOVERY_EXTEND_NANDROID_MENU TARGET_USE_CUSTOM_LUN_FILE_PATH TARGET_DEVICE TARGET_RECOVERY_FSTAB
+BOARD_RECOVERY_DEFINES += BRIGHTNESS_SYS_FILE BATTERY_LEVEL_PATH RECOVERY_TOUCHSCREEN_SWAP_XY RECOVERY_TOUCHSCREEN_FLIP_X RECOVERY_TOUCHSCREEN_FLIP_Y
 
 $(foreach board_define,$(BOARD_RECOVERY_DEFINES), \
   $(if $($(board_define)), \
@@ -130,11 +92,11 @@ LOCAL_STATIC_LIBRARIES += libext4_utils_static libz libsparse_static
 
 LOCAL_MODULE_TAGS := eng
 
-ifeq ($(BOARD_CUSTOM_RECOVERY_KEYMAPPING),)
+#ifeq ($(BOARD_CUSTOM_RECOVERY_KEYMAPPING),)
   LOCAL_SRC_FILES += default_recovery_keys.c
-else
-  LOCAL_SRC_FILES += $(BOARD_CUSTOM_RECOVERY_KEYMAPPING)
-endif
+#else
+#  LOCAL_SRC_FILES += $(BOARD_CUSTOM_RECOVERY_KEYMAPPING)
+#endif
 
 LOCAL_STATIC_LIBRARIES += libvoldclient libsdcard libminipigz libfsck_msdos
 LOCAL_STATIC_LIBRARIES += libmake_ext4fs libext4_utils_static libz libsparse_static
@@ -164,9 +126,6 @@ include $(BUILD_EXECUTABLE)
 
 RECOVERY_LINKS := bu make_ext4fs edify busybox flash_image dump_image mkyaffs2image unyaffs erase_image nandroid reboot volume setprop getprop start stop dedupe minizip setup_adbd fsck_msdos newfs_msdos vdc sdcard pigz
 
-ifeq ($(TARGET_USERIMAGES_USE_F2FS), true)
-RECOVERY_LINKS += mkfs.f2fs fsck.f2fs fibmap.f2fs
-endif
 
 # nc is provided by external/netcat
 RECOVERY_SYMLINKS := $(addprefix $(TARGET_RECOVERY_ROOT_OUT)/sbin/,$(RECOVERY_LINKS))
@@ -259,17 +218,4 @@ include $(commands_recovery_local_path)/applypatch/Android.mk
 include $(commands_recovery_local_path)/utilities/Android.mk
 include $(commands_recovery_local_path)/su/Android.mk
 include $(commands_recovery_local_path)/voldclient/Android.mk
-include $(commands_recovery_local_path)/device_images/Android.mk
-
-ifneq ($(BOARD_USE_FB2PNG),false)
-    include $(commands_recovery_local_path)/fb2png/Android.mk
-endif
-
-ifneq ($(BOARD_USE_NTFS_3G),false)
-    include $(commands_recovery_local_path)/ntfs-3g/Android.mk
-endif
-
-ifeq ($(NO_AROMA_FILE_MANAGER),)
-	include $(commands_recovery_local_path)/aromafm/Android.mk
-endif
 commands_recovery_local_path :=

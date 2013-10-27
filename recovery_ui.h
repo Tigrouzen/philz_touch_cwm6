@@ -19,9 +19,6 @@
 
 #include "common.h"
 
-#ifdef PHILZ_TOUCH_RECOVERY
-#include "/root/Desktop/PhilZ_Touch/touch_source/philz_touch.h"
-#endif
 
 // Called before UI library is initialized.  Can change things like
 // how many frames are included in various animations, etc.
@@ -83,10 +80,7 @@ int device_wipe_data();
 #define HIGHLIGHT_DOWN      -3
 #define SELECT_ITEM         -4
 #define GO_BACK             -5
-#ifdef PHILZ_TOUCH_RECOVERY
-#define HIGHLIGHT_ON_TOUCH  -6
-#define GESTURE_ACTIONS     -7
-#endif
+
 
 // main menu items for prompt_and_wait()
 #define ITEM_REBOOT          0
@@ -95,13 +89,12 @@ int device_wipe_data();
 #define ITEM_APPLY_ZIP       1  // used for installing an update from a zip
 #define ITEM_WIPE_DATA       2
 #define ITEM_WIPE_CACHE      3
-// unused in cwr
-#define ITEM_APPLY_CACHE     4
+#define ITEM_APPLY_CACHE     4 // unused in cwr
 #define ITEM_NANDROID        4
 #define ITEM_PARTITION       5
 #define ITEM_ADVANCED        6
 #define ITEM_PHILZ_MENU      7
-#define ITEM_POWEROFF        8
+#define ITEM_DEVIL	         8
 
 // Header text to display above the main menu.
 extern char* MENU_HEADERS[];

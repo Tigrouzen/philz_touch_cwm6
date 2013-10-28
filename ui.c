@@ -413,8 +413,6 @@ static void *progress_thread(void *cookie)
     return NULL;
 }
 
-//kanged this vibrate stuff from teamwin (thanks guys!)
-#define VIBRATOR_TIME_MS        20
 
 static int rel_sum = 0;
 
@@ -487,7 +485,6 @@ static int input_callback(int fd, short revents, void *data)
                     ev.code = KEY_HOME;
                     reset_gestures();
                 }
-                vibrate(VIBRATOR_TIME_MS);
             }
             if(slide_right == 1) {
                 ev.code = KEY_HOME;

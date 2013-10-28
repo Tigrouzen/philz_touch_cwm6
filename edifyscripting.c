@@ -327,14 +327,14 @@ int run_and_remove_extendedcommand()
         }
         sleep(1);
     }
-    remove("/sdcard/clockworkmod/.recoverycheckpoint");
+    remove("/storage/sdcard0/clockworkmod/.recoverycheckpoint");
     if (i == 0) {
         ui_print("Timed out waiting for SD card... continuing anyways.");
     }
 
     ui_print("Verifying SD Card marker...\n");
     struct stat st;
-    if (stat("/sdcard/clockworkmod/.salted_hash", &st) != 0) {
+    if (stat("/storage/sdcard0/clockworkmod/.salted_hash", &st) != 0) {
         ui_print("SD Card marker not found...\n");
         if (volume_for_path("/emmc") != NULL) {
             ui_print("Checking Internal SD Card marker...\n");

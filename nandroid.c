@@ -55,11 +55,11 @@ void nandroid_generate_timestamp_path(char* backup_path)
     {
         struct timeval tp;
         gettimeofday(&tp, NULL);
-        sprintf(backup_path, "/sdcard/clockworkmod/backup/%ld", tp.tv_sec);
+        sprintf(backup_path, "/storage/sdcard0/clockworkmod/backup/%ld", tp.tv_sec);
     }
     else
     {
-        strftime(backup_path, PATH_MAX, "/sdcard/clockworkmod/backup/%F.%H.%M.%S", tmp);
+        strftime(backup_path, PATH_MAX, "/storage/sdcard0/clockworkmod/backup/%F.%H.%M.%S", tmp);
     }
 }
 
@@ -344,7 +344,7 @@ int nandroid_backup_partition_extended(const char* backup_path, const char* moun
 
     struct stat file_info;
     ensure_path_mounted(get_primary_storage_path());
-    int callback = stat("/sdcard/clockworkmod/.hidenandroidprogress", &file_info) != 0;
+    int callback = stat("/storage/sdcard0/clockworkmod/.hidenandroidprogress", &file_info) != 0;
 
     ui_print("\n>> Backing up %s...\n", mount_point);
     if (0 != (ret = ensure_path_mounted(mount_point) != 0)) {
@@ -582,7 +582,7 @@ int nandroid_backup(const char* backup_path)
     sprintf(tmp, "cp /tmp/recovery.log %s/recovery.log", backup_path);
     __system(tmp);
 
-    sprintf(tmp, "chmod -R 777 %s ; chmod -R u+r,u+w,g+r,g+w,o+r,o+w /sdcard/clockworkmod ; chmod u+x,g+x,o+x /sdcard/clockworkmod/backup ; chmod u+x,g+x,o+x /sdcard/clockworkmod/blobs", backup_path);
+    sprintf(tmp, "chmod -R 777 %s ; chmod -R u+r,u+w,g+r,g+w,o+r,o+w /storage/sdcard0/clockworkmod ; chmod u+x,g+x,o+x /storage/sdcard0/clockworkmod/backup ; chmod u+x,g+x,o+x /storage/sdcard0/clockworkmod/blobs", backup_path);
     __system(tmp);
 
     finish_nandroid_job();
@@ -867,7 +867,7 @@ int nandroid_restore_partition_extended(const char* backup_path, const char* mou
     ensure_directory(mount_point);
 
     ensure_path_mounted(get_primary_storage_path());
-    int callback = stat("/sdcard/clockworkmod/.hidenandroidprogress", &file_info) != 0;
+    int callback = stat("/storage/sdcard0/clockworkmod/.hidenandroidprogress", &file_info) != 0;
 
     ui_print("Restoring %s...\n", name);
     if (backup_filesystem == NULL) {

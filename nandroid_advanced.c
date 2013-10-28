@@ -922,7 +922,7 @@ int nandroid_backup_datamedia(const char* backup_path)
 
     ensure_path_mounted(get_primary_storage_path());
     struct stat s;
-    int callback = stat("/sdcard/clockworkmod/.hidenandroidprogress", &s) != 0;
+    int callback = stat("/storage/sdcard0/clockworkmod/.hidenandroidprogress", &s) != 0;
 
     compute_directory_stats("/data/media");
     Volume *v = volume_for_path("/data");
@@ -976,7 +976,7 @@ int nandroid_restore_datamedia(const char* backup_path)
 
     ensure_path_mounted(get_primary_storage_path());
     struct stat s;
-    int callback = stat("/sdcard/clockworkmod/.hidenandroidprogress", &s) != 0;
+    int callback = stat("/storage/sdcard0/clockworkmod/.hidenandroidprogress", &s) != 0;
 
     char backup_file_image[PATH_MAX];
     char cmd[PATH_MAX];

@@ -257,7 +257,7 @@ int is_data_media_volume_path(const char* path) {
         return 0;
     }
 
-    return strcmp(path, "/sdcard") == 0 || path == strstr(path, "/sdcard/");
+    return strcmp(path, "/sdcard") == 0 || path == strstr(path, "/storage/sdcard0/");
 }
 
 int ensure_path_mounted(const char* path) {

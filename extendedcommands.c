@@ -544,12 +544,12 @@ int confirm_selection(const char* title, const char* confirm)
     struct stat info;
     int ret = 0;
 
-    if (0 == stat("/sdcard/clockworkmod/.no_confirm", &info))
+    if (0 == stat("%s/clockworkmod/.no_confirm", &info))
         return 1;
 
     char* confirm_str = strdup(confirm);
     const char* confirm_headers[]  = {  title, "  THIS CAN NOT BE UNDONE.", "", NULL };
-    int many_confirm = 0 == stat("/sdcard/clockworkmod/.many_confirm", &info);
+    int many_confirm = 0 == stat("%s/clockworkmod/.many_confirm", &info);
 
     if (many_confirm) {
         char* items[] = { "No",
@@ -861,7 +861,7 @@ int show_partition_menu()
             list[mountable_volumes + formatable_volumes] = "mount USB storage";
             list[mountable_volumes + formatable_volumes + 1] = '\0';
         } else {
-            list[mountable_volumes + formatable_volumes] = "format /data and /data/media (/sdcard)";
+            list[mountable_volumes + formatable_volumes] = "format /data and /data/media (/storage/sdcard0)";
             list[mountable_volumes + formatable_volumes + 1] = "mount USB storage";
             list[mountable_volumes + formatable_volumes + 2] = '\0';
         }
@@ -874,7 +874,7 @@ int show_partition_menu()
                 show_mount_usb_storage_menu();
             }
             else {
-                if (!confirm_selection("format /data and /data/media (/sdcard)", confirm))
+                if (!confirm_selection("format /data and /data/media (/storage/sdcard0)", confirm))
                     continue;
                 ignore_data_media_workaround(1);
                 ui_print("Formatting /data...\n");
@@ -1517,7 +1517,7 @@ void show_debug_menu()
             		{
 				if ( 0 == ensure_path_mounted("/storage/sdcard0") )
 				{          
-					__system("mkdir -p /sdcard/devil");	
+					__system("mkdir -p %s/devil");	
 					__system("cp /proc/last_kmsg /storage/sdcard0/devil/");
 					__system("cp /proc/cmdline /storage/sdcard0/devil/");
 					ui_print("last_kmsg and /proc/cmdline copied to /storage/sdcard0/devil\n");
@@ -1534,9 +1534,9 @@ void show_debug_menu()
             		{
 				if ( 0 == ensure_path_mounted("/storage/sdcard0") )
 				{   
-					mkdir("/sdcard/devil", S_IRWXU);
-					__system("cp /tmp/recovery.log /sdcard/devil/recovery.log");
-					ui_print("/tmp/recovery.log was copied to /sdcard/devil/recovery.log.\n");
+					mkdir("%s/devil", S_IRWXU);
+					__system("cp /tmp/recovery.log %s/devil/recovery.log");
+					ui_print("/tmp/recovery.log was copied to %s/devil/recovery.log.\n");
 				}
 				else
 				{
@@ -1574,13 +1574,6 @@ int show_devil_menu()
 		switch (chosen_item)
         	{
 			case 0:
-			{
-				show_misc_menu();
-				break;
-			}
-
-
-			case 1:
 			{
 				show_debug_menu();
 				break;
@@ -1624,7 +1617,7 @@ void create_fstab()
     write_fstab_root("/cache", file);
     write_fstab_root("/data", file);
     write_fstab_root("/system", file);
-    write_fstab_root("/sdcard", file);
+    write_fstab_root("/storage/sdcard0", file);
     fclose(file);
     LOGI("Completed outputting fstab.\n");
 }
@@ -1721,9 +1714,9 @@ void handle_failure(int ret)
         return;
     if (0 != ensure_path_mounted(get_primary_storage_path()))
         return;
-    mkdir("/sdcard/clockworkmod", S_IRWXU | S_IRWXG | S_IRWXO);
-    __system("cp /tmp/recovery.log /sdcard/clockworkmod/recovery.log");
-    ui_print("/tmp/recovery.log was copied to /sdcard/clockworkmod/recovery.log. Please open ROM Manager to report the issue.\n");
+    mkdir("%s/clockworkmod", S_IRWXU | S_IRWXG | S_IRWXO);
+    __system("cp /tmp/recovery.log %s/clockworkmod/recovery.log");
+    ui_print("/tmp/recovery.log was copied to %s/clockworkmod/recovery.log. Please open ROM Manager to report the issue.\n");
 }
 
 static int is_path_mounted(const char* path) {

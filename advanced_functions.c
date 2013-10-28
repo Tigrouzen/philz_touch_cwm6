@@ -1321,7 +1321,7 @@ void misc_nandroid_menu()
             ui_format_gui_menu(item_size_progress, "Show Nandroid Size Progress", "(x)");
         else ui_format_gui_menu(item_size_progress, "Show Nandroid Size Progress", "( )");
 
-        char hidenandprogress_file[] = "/sdcard/clockworkmod/.hidenandroidprogress";
+        char hidenandprogress_file[] = "/storage/sdcard0/clockworkmod/.hidenandroidprogress";
         int hidenandprogress = file_found(hidenandprogress_file);
         if (hidenandprogress)
             ui_format_gui_menu(item_nand_progress, "Hide Nandroid Progress", "(x)");

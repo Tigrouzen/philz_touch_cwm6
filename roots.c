@@ -470,6 +470,7 @@ int format_volume(const char* volume) {
             LOGE("format_volume: make_extf4fs failed on %s\n", v->blk_device);
             return -1;
         }
+	__system("busybox mount system");
         return 0;
     }
 
